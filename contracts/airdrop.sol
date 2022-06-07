@@ -153,6 +153,19 @@ contract AirDrop is Ownable,ReentrancyGuard,Pausable,EIP712,AccessControl {
         token.safeTransfer(_msgSender(),amount);
     }
 
+    function checkSign(        
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s) public view returns (address) {
+        bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, _msgSender(), amount, nonces(_msgSender()), deadline));
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(hash, v, r, s);
+
+        return signer;
+    }
+
     function claimWithRoot(
         uint256 amount,
         bytes32[] calldata proof
