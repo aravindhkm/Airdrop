@@ -13,8 +13,40 @@ async function deploy(name, ...params) {
   return await Contract.deploy(...params).then(f => f.deployed());
 }
 
-function hashToken(tokenId, account) {
-  return Buffer.from(ethers.utils.solidityKeccak256(['uint256', 'address'], [tokenId, account]).slice(2), 'hex')
+function hashToken(account,amount) {
+  return Buffer.from(ethers.utils.solidityKeccak256(['address','uint256'], [account,amount]).slice(2), 'hex')
+}
+
+async function sign(airDropAddress,user1,amount,nonce,deadline) {
+    const domain = {
+        name: 'AirDrop',
+        version: '1',
+        chainId: 31337,
+        verifyingContract: airDropAddress,
+    };
+
+    // The named list of all type definitions
+    const types = {
+        Permit: [
+            { name: 'user', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'deadline', type: 'uint256' }
+        ]
+    };
+
+    // The data to sign
+    const value = {
+        user: user1,
+        value: amount,
+        nonce: nonce,
+        deadline: deadline
+    };
+    let privateKey = "b01bec163fad02aad4df5339ebf11a42f32316cbd15db6c9d9c595b1ae5702ae";
+    let wallet = new ethers.Wallet(privateKey);
+    let signature = await wallet._signTypedData(domain, types, value);
+
+    return signature;
 }
 
 
@@ -31,56 +63,34 @@ contract("Token Gas Reduce", (accounts) => {
   describe("Token Set", () => {
       it("admin token transfer", async function () {
         let user1 = accounts[1];
-        let amount = "10000000000";
+        let amount = "100000000000000000000";
         let singerHash = await airDropInstance.SIGNER_ROLE();
-        await tokenInstance.transfer(user1,amount, {from: owner});
+        await tokenInstance.transfer(airDropInstance.address,amount, {from: owner});
         await airDropInstance.setRoot(merkleTree.getHexRoot(), {from: owner});
         await airDropInstance.grantRole(singerHash,"0x17Ca0928871b2dB9dd3B2f8b27148a436C24Baa8", {from: owner});
-
-        
-        console.log("merkleTree", merkleTree.getHexRoot());
-        console.log("length", (accounts.length));
       });  
 
-      it("add liquidity", async function () {
+      it("claimWithPermit", async function () {
         let user1 = accounts[1];
         let amount = "10000000000";
-
-        const domain = {
-            name: 'AirDrop',
-            version: '1',
-            chainId: 31337,
-            verifyingContract: airDropInstance.address
-        };
-        
-        // The named list of all type definitions
-        const types = {
-            Permit: [
-                { name: 'user', type: 'address' },
-                { name: 'value', type: 'uint256' },
-                { name: 'nonce', type: 'uint256' },
-                { name: 'deadline', type: 'uint256' }
-            ]
-        };
-        
-        // The data to sign
-        const value = {
-            user: user1,
-            value: amount,
-            nonce: "1",
-            deadline: "1349889989898"
-        };
-        let privateKey = "b01bec163fad02aad4df5339ebf11a42f32316cbd15db6c9d9c595b1ae5702ae";
-        let wallet = new ethers.Wallet(privateKey);
-        signature = await wallet._signTypedData(domain, types, value);
+        let deadline = "1349889989898";
+        let nonce = await airDropInstance.nonces(user1);  
+        signature = await sign(airDropInstance.address,user1,amount,"0",deadline);
         let vrs = ethers.utils.splitSignature(signature);
 
-        console.log("signature",vrs);
-
-        let addr = await airDropInstance.checkSign(amount,"1349889989898",vrs.v,vrs.r,vrs.s, {from:user1});
-
-        console.log("Recover Address", addr)
+        await airDropInstance.claimWithPermit(amount,"1349889989898",vrs.v,vrs.r,vrs.s, {from:user1});
       });  
+
+      it("claimWithRoot", async function () {
+        let user1 = accounts[1];
+        let amount = "10000000000000000000";
+
+        console.log("user1",user1)
+        
+        const proof = merkleTree.getHexProof(hashToken(user1, amount));
+
+        await airDropInstance.claimWithRoot(amount,proof, {from:user1});
+      }); 
   })
 
   // describe("RewardPool Test", () => {
