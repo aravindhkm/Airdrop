@@ -92,6 +92,7 @@ module.exports = {
     testnet: {
       url: process.env.BSC_TESTNET || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 'auto'
     },
     mainnet: {
       url: process.env.BSC_MAINNET || "",

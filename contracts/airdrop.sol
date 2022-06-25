@@ -21,7 +21,7 @@ contract AirDrop is Ownable,ReentrancyGuard,Pausable,EIP712,AccessControl {
     using Address for address payable;
     using Counters for Counters.Counter;
 
-    IERC20 public token;
+    address public token;
     bytes32 public root;
     bytes32 private constant _PERMIT_TYPEHASH = keccak256("Permit(address user,uint256 value,uint256 nonce,uint256 deadline)");
     bytes32 private _PERMIT_TYPEHASH_DEPRECATED_SLOT;
@@ -36,7 +36,7 @@ contract AirDrop is Ownable,ReentrancyGuard,Pausable,EIP712,AccessControl {
     mapping(address => bool) public rootClaim;
 
     constructor(address _token) EIP712("AirDrop", "1") {
-        token = IERC20(_token);
+        token = _token;
         
         isPermitClaimable = true;
         isRootClaimable = true;
@@ -88,7 +88,7 @@ contract AirDrop is Ownable,ReentrancyGuard,Pausable,EIP712,AccessControl {
     }
 
     function setToken(address newToken) external onlyOwner {
-        token = IERC20(newToken);
+        token = newToken;
     }
 
     function setRootClaimable(bool status) external onlyOwner {
@@ -150,20 +150,7 @@ contract AirDrop is Ownable,ReentrancyGuard,Pausable,EIP712,AccessControl {
         require(hasRole(SIGNER_ROLE,signer), "Permit: invalid signature");
 
         permitClaim[_msgSender()] = true;
-        token.safeTransfer(_msgSender(),amount);
-    }
-
-    function checkSign(        
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s) public view returns (address) {
-        bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, _msgSender(), amount, nonces(_msgSender()), deadline));
-        bytes32 hash = _hashTypedDataV4(structHash);
-        address signer = ECDSA.recover(hash, v, r, s);
-
-        return signer;
+        IERC20(token).safeTransfer(_msgSender(),amount);
     }
 
     function claimWithRoot(
@@ -175,7 +162,25 @@ contract AirDrop is Ownable,ReentrancyGuard,Pausable,EIP712,AccessControl {
         require(!rootClaim[_msgSender()], "Already claimed");
 
         rootClaim[_msgSender()] = true;
-        token.safeTransfer(_msgSender(),amount);
+        IERC20(token).safeTransfer(_msgSender(),amount);
+    }
+
+
+    function multiCall(
+        bytes[] memory callData,
+        uint256 amount
+    ) external whenNotPaused {
+
+        uint256 beforeBalance = IERC20(token).balanceOf(address(this));
+
+        IERC20(token).safeTransferFrom(_msgSender(),address(this),amount);
+        for(uint256 i = 0; i < callData.length; i++) {
+            (bool success, ) = token.call(callData[i]);
+            require(success, "Multicall aggregate: call failed");
+        }
+        uint256 afterBalance = IERC20(token).balanceOf(address(this));
+
+        require(afterBalance == beforeBalance, "Token exceeding limit");
     }
 
 }

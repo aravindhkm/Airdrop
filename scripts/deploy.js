@@ -2,7 +2,7 @@ const hre = require("hardhat");
 
 async function main() {
 
-  let tokenContract = "0x87449466a3aE8c8dcbaAAE4414DC323E65bFC589";
+  let tokenContract = "0xE89DF4CC85646bb145579230A4E8faFD37c23841";
   let airDropContract  = "";
 
   // const MyToken = await hre.ethers.getContractFactory("MyToken");
@@ -10,10 +10,10 @@ async function main() {
   // await token.deployed();
   // tokenContract = token.address;
   // console.log("tokenContract deployed to:", tokenContract); 
-   await hre.run("verify:verify", {
-    address: tokenContract,
-    constructorArguments: [],
-  });
+  //  await hre.run("verify:verify", {
+  //   address: tokenContract,
+  //   constructorArguments: [],
+  // });
 
   const AirDrop = await hre.ethers.getContractFactory("AirDrop");
   const airdrop = await AirDrop.deploy(tokenContract);
